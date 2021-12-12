@@ -1,34 +1,35 @@
+//Declaración de librerías
 #include <ESP8266WiFi.h> //Libreria WiFi para el ESP8266
-
 #include <EEPROM.h> //Libreria EEPROM
-
 #include <Wire.h> //Libreria I2C
 
-byte modo; //Variable de control de estado
-char ssid[30], pass[30], ipuser[30]; //Parametros de la red WiFi
-IPAddress ip(192, 168, 0, 70); //Direccion IP fija establecida
-IPAddress puerta(192, 168, 0, 1); //Puerta de la red
-IPAddress mascara(255, 255, 255, 0); //Mascara de la red
-IPAddress ipEE; //IP variable guardada en la EEPROM para utilizarla en ipconfig
+//Declaración de variables de la librería ESP8266WiFi.h
+IPAddress ip(192, 168, 0, 70); //Direccion IP fija establecida para configuracion
+IPAddress puerta(192, 168, 0, 1); //Puerta de la red para configuracion
+IPAddress mascara(255, 255, 255, 0); //Mascara de la red para onfiguracion
+IPAddress ipEE; //IP variable guardada en la EEPROM como texto pasada a variable de tipo IP
 WiFiServer servidor80(80); //El puerto 80 por defecto es el HTTP
-WiFiServer servidor23(23); // Puerto 23, para comunicarse a traves del .exe
+WiFiServer servidor23(23); //Puerto 23, para comunicarse a traves del .exe por TCP/IP normal
 WiFiClient cliente; //Inicializa la libreria Client
 
+//Declaración de variables estándar
+byte modo; //Variable de control de estado
+char ssid[30], pass[30], ipuser[30]; //Parametros de la red WiFi en texto
 byte Rojo_ON_MSB; //Variable empleada para transmitir la informacion del led rojo alto cuando esta encendido
 byte Rojo_ON_LSB; //Variable empleada para transmitir la informacion del led rojo bajo cuando esta encendido
 byte Rojo_OFF_MSB; //Variable empleada para transmitir la informacion del led rojo alto cuando esta apagado
 byte Rojo_OFF_LSB; //Variable empleada para transmitir la informacion del led rojo bajo cuando esta apagado
 char datos[4]; //Realiza la toma de Rojo_ON_MSB; Rojo_ON_LSB; Rojo_OFF_MSB y Rojo_OFF_LSB
 
-void GuardaEE(String texto, int dir) //Funcion para escribir en la EEPROM (sin commit)
+void GuardaEE(String texto, int dir) //Funcion para escribir en la EEPROM (sin commit, guarda valores en el buffer)
 {
   for (int i = 0; i < texto.length(); i++) EEPROM.write(dir + i, texto[i]); //desde i=0 hasta la longitud de la ssid
   EEPROM.write(dir + texto.length(), 0); //se añade un 0 al final (En linux sería al principio seguramente)
-}
+} //Fin GuardaEE
 
 void LeeEE() { //funcion para leer datos desde la EEPROM
   int i; //Iterador, itera 30 caracteres de cada elemento almacenado en la EEPROM
-  for (i = 0; i < 30; i++) {
+  for (i = 0; i < 30; i++) { //Escogidas direcciones 10 40 y 70 arbitrariamente
     ssid[i] = EEPROM.read(10 + i); //Nombre de la red
     pass[i] = EEPROM.read(40 + i); //Contraseña
     ipuser[i] = EEPROM.read(70 + i); //IP variable introducida por el usuario
@@ -37,9 +38,9 @@ void LeeEE() { //funcion para leer datos desde la EEPROM
   Serial.println(ssid);
   Serial.println(pass);
   Serial.println(ipuser);
-}
+} //Fin LeeEE()
 
-void enviarpagina() {
+void enviarpagina() { //HTML devuelto por el servidor al acceder a la IP de configuración establecida
   String pagina = String("HTTP/1.1 200 OK\r\n") + //String de codigo de respuesta HTTP (la solicitud ha tenido éxito)
     "Content-Type: text/html\r\n"+
     "Connection: close\r\n"+
@@ -60,28 +61,28 @@ void enviarpagina() {
     "</body>"+
     "</html>";
   cliente.println(pagina); //Print en monitor serie
-  cliente.stop();
-}
+  cliente.stop(); //Se cierra el cliente al acabar para que pueda acceder otra persona
+} //Fin enviarpagina()
 
 void configsensorluz() { //Configuracion del sensor de luz mediante I2C
   //Configuracion ADC
-  Wire.beginTransmission(B0111001); // Bit start + direccion del sensor I2C (slave) + Bit write
-  Wire.write(B10000000); // Registro CONTROL (0x00)
-  Wire.write(B00000011); // ADC activado (penultimo bit ADC_EN = 1) y alimentado (ultimo bit POWER = 1)
-  Wire.endTransmission(true); // Bit stop
+  Wire.beginTransmission(B0111001); //Bit start + direccion del sensor I2C (slave) + Bit write
+  Wire.write(B10000000); //Registro CONTROL (0x00)
+  Wire.write(B00000011); //ADC activado (penultimo bit ADC_EN = 1) y alimentado (ultimo bit POWER = 1)
+  Wire.endTransmission(true); //Bit stop
 
   //Configuracion de integracion
-  Wire.beginTransmission(B0111001); // Bit start + direccion del sensor I2C (slave) + Bit write
-  Wire.write(B10000001); // Registro TIMING (0x01)
-  Wire.write(B00000000); // Integracion libre (tercero y cuarto bit MSB = 00) cada 12 ms (LSB=0000)
-  Wire.endTransmission(true); // Bit stop
+  Wire.beginTransmission(B0111001); //Bit start + direccion del sensor I2C (slave) + Bit write
+  Wire.write(B10000001); //Registro TIMING (0x01)
+  Wire.write(B00000000); //Integracion libre (tercero y cuarto bit MSB = 00) cada 12 ms (LSB=0000)
+  Wire.endTransmission(true); //Bit stop
 
   //Configuracion de ganancia
-  Wire.beginTransmission(B0111001); // Bit start + direccion del sensor I2C (slave) + Bit write
-  Wire.write(B10000111); // Registro GAIN (0x07)
-  Wire.write(B00110000); // Ganancia x64 (tercer y cuarto bit = 1) sin modo prescaler (tres LSB = 000)
-  Wire.endTransmission(true); // Bit stop
-}
+  Wire.beginTransmission(B0111001); //Bit start + direccion del sensor I2C (slave) + Bit write
+  Wire.write(B10000111); //Registro GAIN (0x07)
+  Wire.write(B00110000); //Ganancia x64 (tercer y cuarto bit = 1) sin modo prescaler (tres LSB = 000)
+  Wire.endTransmission(true); //Bit stop
+} //Fin configsensor()
 
 void lecturasensor() { //Funcion encargada de realizar la medicion del sensor de luz roja
   //Medidas con el LED encendido
@@ -123,7 +124,7 @@ void lecturasensor() { //Funcion encargada de realizar la medicion del sensor de
   Wire.requestFrom(B0111001, 1); //Lectura de 1 byte (ultimo parametro) en este registro
   Rojo_OFF_LSB = Wire.read(); //Almacenamiento del valor en una variable
   Serial.println(Rojo_OFF_LSB);
-}
+} //Fin lecturasensor()
 
 void setup() { //Loop setup (solo se inicializa una vez)
 
@@ -139,15 +140,16 @@ void setup() { //Loop setup (solo se inicializa una vez)
 
   //Setup EEPROM
   EEPROM.begin(512); //Crea un buffer de RAM de 512 bytes y copia ahí los datos de la EEPROM
-  
+ 
   //Setup conexion I2C
   Wire.setClock(400000); //Frecuencia de SCL indicada (Fast mode, 400kHz)
   Wire.begin(15,13); //Inicializacion de I2C con GPIO15 como SDA y GPIO13 como SCL
+  //Valdria cualquier GPIO para la conexion I2C pero hay limitaciones al conectarlo obligatoriamente en estos pines
 
   //Setup Wifi
   WiFi.mode(WIFI_OFF); //Para evitar errores se apaga el WiFi para ponerlo en modo inicial
   delay(100); //Espera de 100ms
-  
+ 
   if (modo == 0) { //Si el modo es 0 (configuracion)
     WiFi.softAPConfig(ip, puerta, mascara);
     WiFi.softAP("Mario"); //Crea un punto de acceso de read llamada "Mario"
@@ -156,18 +158,18 @@ void setup() { //Loop setup (solo se inicializa una vez)
     servidor80.begin(); //Servidor de puerto 80 iniciado (HTTP)
   } else { //Modo 1 (funcionamiento normal)
     LeeEE(); //Llamada a la funcion de lectura de la EEPROM ya declarada
-    ipEE.fromString(ipuser); //Saca la IP fija
+    ipEE.fromString(ipuser); //Convierte la variable de texto ipuser en una variable IP
     WiFi.config(ipEE, ipEE, mascara); //Ahora no son constantes, se leen de la EEPROM
     WiFi.begin(ssid, pass); //Inicializa conexion al WiFi con nombre de red y contraseña introducidos como parametros
-    while (WiFi.status() != WL_CONNECTED) { //Si no se establece conexion
+    while (WiFi.status() != WL_CONNECTED) { //Si no se establece conexión
       delay(500); //Esperar medio segundo
       Serial.print("."); //Imprimir un punto
     }
-    Serial.print("Conectado! IP address: "); //
+    Serial.print("Conectado! IP address: "); //Al establecer conexión en el modo normal
     Serial.println(WiFi.localIP()); //
     servidor23.begin(); //Iniciacion del servidor en el puerto 23
   }
-}
+} //Fin setup
 
 void loop() {
   if (modo == 0) { //modo 0
@@ -179,7 +181,7 @@ void loop() {
         String linea = cliente.readStringUntil('\r'); //Hasta que mande un \r (retorno de carro)
         Serial.println(linea); //imprime linea
         Serial.println(linea.length()); //imprime la longitud de linea (para depurar solo)
-        if (linea.length() == 1 && linea[0] == '\n') //Si se lee el 1 final que devuelve la pagina
+        if (linea.length() == 1 && linea[0] == '\n') //Si se lee el 1 final que devuelve la pagina (cuando el navegador acaba de leer cosas)
           enviarpagina();
         // buscamos GET en posicion 0 (lineas que empiecen por GET cuando el cliente esta conectado (el primero del monitor serie no)
         int posicion;
@@ -212,9 +214,9 @@ void loop() {
   } else //el modo normal (modo == 1)
   {
     configsensorluz(); //Funcion para configurar y declarar los registros del sensor
-    lecturasensor(); //Lectura de datos y procesamiento de bytes
+    lecturasensor(); //Lectura de datos y procesamiento de bytes de nuevo por el problema con los GPIOs
 
-    // Array datos[] compuesto por las medidas recogidas
+    // Array datos[] compuesto por las medidas recogidas en lecturasensor()
     datos[0] = Rojo_ON_MSB;
     datos[1] = Rojo_ON_LSB;
     datos[2] = Rojo_OFF_MSB;
@@ -222,13 +224,12 @@ void loop() {
 
     //En caso de que no haya ningun cliente conectado
     if (!cliente) { //Si no hay ningun cliente conectado estamos mirando hasta que alguien se conecte (o se conecta alguien o no hago nada)
-      cliente = servidor23.available();
+      cliente = servidor23.available(); //Comprobando conexion
     }
 
     //En caso de que haya un cliente conectado es cuando ya realizamos la transmision de los datos
-    if (cliente) {
-      cliente.write(datos, 4); // Envío la medición
+    if (cliente) { //Si hay conexión
+      cliente.write(datos, 4); // Envío la medición, protocolo acordado en clase (no es estándar)
     }
   }
-
-} //Fin loop()
+}
